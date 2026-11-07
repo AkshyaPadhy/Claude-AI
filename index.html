@@ -194,7 +194,7 @@ async function fetchWeather(cities) {
     const res = await fetch(url);
     if (!res.ok) throw new Error(`Weather service returned ${res.status}`);
     const data = await res.json();
-    (Array.isArray(data) ? data : [data]).forEach((d, j) => out.set(key(batch[j]), d.current));
+    (Array.isArray(data) ? data : [data]).forEach((d, j) => out.set(key(batch[j]), { ...d.current, timezone: d.timezone }));
   }
   return out;
 }
@@ -203,7 +203,13 @@ const fmtTemp = c => {
   const v = state.unit === "F" ? c * 9 / 5 + 32 : c;
   return `${Math.round(v)}°${state.unit}`;
 };
-const fmtWind = kmh => state.unit === "F" ? `${Math.round(kmh * 0.621371)} mph` : `${Math.round(kmh)} km/h`;
+const fmtLocalTime = tz => {
+  try {
+    return new Intl.DateTimeFormat([], { timeZone: tz, weekday: "short", hour: "numeric", minute: "2-digit" }).format(new Date());
+  } catch { return "—"; }
+};
+const tickClocks = () => document.querySelectorAll("[data-tz]").forEach(el => { el.textContent = fmtLocalTime(el.dataset.tz); });
+const fmtWind =kmh => state.unit === "F" ? `${Math.round(kmh * 0.621371)} mph` : `${Math.round(kmh)} km/h`;
 
 function renderFilters() {
   const conts = ["All", ...new Set(allCities().map(c => c.continent))];
@@ -233,12 +239,16 @@ function renderGrid() {
         <div class="main"><span class="icon">${d.icon}</span><span class="temp">${fmtTemp(w.temperature_2m)}</span></div>
         <div class="cond">${d.text}</div>
         <dl>
+          <dt>Local time</dt><dd class="localtime"></dd>
           <dt>Feels like</dt><dd>${fmtTemp(w.apparent_temperature)}</dd>
           <dt>Humidity</dt><dd>${Math.round(w.relative_humidity_2m)}%</dd>
           <dt>Wind</dt><dd>${fmtWind(w.wind_speed_10m)}</dd>
         </dl>`;
       card.querySelector("h2").textContent = c.name;
       card.querySelector(".country").textContent = c.country;
+      const lt = card.querySelector(".localtime");
+      lt.dataset.tz = w.timezone;
+      lt.textContent = fmtLocalTime(w.timezone);
       if (state.custom.includes(c)) {
         const x = document.createElement("button");
         x.className = "remove"; x.title = "Remove"; x.textContent = "×";
@@ -329,6 +339,9 @@ $("themeSwitch").onclick = () => {
 };
 applyTheme(timeTheme());
 setInterval(() => { if (!manualTheme) applyTheme(timeTheme()); }, 60000);
+
+setInterval(tickClocks, 30000);
+setInterval(() => { if (!document.hidden) refresh(); }, 120000);
 
 load();
 setUnit(state.unit);
