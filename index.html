@@ -74,6 +74,11 @@
           padding: 14px 16px; box-shadow: var(--shadow); position: relative; }
   .card h2 { margin: 0; font-size: 1.05rem; }
   .card .country { color: var(--muted); font-size: .85rem; }
+  .card:not(.skeleton) h2, .card:not(.skeleton) .country { animation: pulse 1.6s ease-in-out infinite; }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
+  @media (prefers-reduced-motion: reduce) {
+    .card h2, .card .country { animation: none !important; }
+  }
   .card .main { display: flex; align-items: center; justify-content: space-between; margin: 8px 0; }
   .card .icon { font-size: 2.6rem; line-height: 1; }
   .card .temp { font-size: 2.2rem; font-weight: 600; }
