@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>World Weather</title>
+<style>
+  :root {
+    --bg: #eef3f9; --card: #ffffff; --text: #1b2733; --muted: #6a7a8c;
+    --accent: #2468c8; --on-accent: #ffffff; --danger: #c53030;
+    --border: #d9e2ec; --shadow: 0 2px 8px rgba(20,40,70,.08);
+    --night-tint: rgba(40,60,120,.18); color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0f1722; --card: #182333; --text: #e6edf5; --muted: #9db0c4;
+      --accent: #5aa2ff; --on-accent: #08111d; --danger: #ff8a8a;
+      --border: #2c3d54; --shadow: 0 2px 8px rgba(0,0,0,.4);
+      --night-tint: rgba(90,130,220,.14); color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0f1722; --card: #182333; --text: #e6edf5; --muted: #9db0c4;
+    --accent: #5aa2ff; --on-accent: #08111d; --danger: #ff8a8a;
+    --border: #2c3d54; --shadow: 0 2px 8px rgba(0,0,0,.4);
+    --night-tint: rgba(90,130,220,.14); color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  header, main { max-width: 1200px; margin: 0 auto; padding: 0 16px; }
+  header { padding-top: 24px; }
+  .titlebar { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  h1 { margin: 0 0 4px; font-size: 1.8rem; }
+  .theme-switch { display: inline-flex; align-items: center; gap: 8px; padding: 4px 6px 4px 10px;
+                  border-radius: 999px; font-size: .85rem; color: var(--muted); }
+  .theme-switch .track { position: relative; width: 48px; height: 26px; border-radius: 999px;
+                         background: var(--border); transition: background .2s; }
+  .theme-switch .thumb { position: absolute; top: 3px; left: 3px; width: 20px; height: 20px;
+                         border-radius: 50%; background: var(--card); display: grid; place-items: center;
+                         font-size: 12px; line-height: 1; box-shadow: var(--shadow);
+                         transition: transform .2s; }
+  .theme-switch[aria-checked="true"] .track { background: var(--accent); }
+  .theme-switch[aria-checked="true"] .thumb { transform: translateX(22px); }
+  .theme-switch:focus-visible, button:focus-visible, input:focus-visible
+    { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .sub { color: var(--muted); margin: 0 0 16px; }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
+  .search { display: flex; gap: 8px; flex: 1 1 260px; position: relative; }
+  input, button, select {
+    font: inherit; color: var(--text); background: var(--card);
+    border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px;
+  }
+  input { flex: 1; min-width: 0; }
+  button { cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  button.active { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+  .seg { display: inline-flex; }
+  .seg button { border-radius: 0; }
+  .seg button:first-child { border-radius: 8px 0 0 8px; }
+  .seg button:last-child { border-radius: 0 8px 8px 0; margin-left: -1px; }
+  .results { position: absolute; top: 100%; left: 0; right: 0; z-index: 10; margin-top: 4px;
+             background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+             box-shadow: var(--shadow); overflow: hidden; }
+  .results button { display: block; width: 100%; text-align: left; border: 0; border-radius: 0; }
+  .results .none { padding: 8px 12px; color: var(--muted); }
+  .filters { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+  .filters button { padding: 4px 12px; border-radius: 999px; font-size: .9rem; }
+  .status { color: var(--muted); font-size: .9rem; margin-bottom: 12px; min-height: 1.3em; }
+  .status.error { color: var(--danger); }
+  .grid { display: grid; gap: 12px; padding-bottom: 32px;
+          grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+  .card { background: var(--card); color: var(--text); border: 1px solid var(--border); border-radius: 12px;
+          padding: 14px 16px; box-shadow: var(--shadow); position: relative; }
+  .card h2 { margin: 0; font-size: 1.05rem; }
+  .card .country { color: var(--muted); font-size: .85rem; }
+  .card .main { display: flex; align-items: center; justify-content: space-between; margin: 8px 0; }
+  .card .icon { font-size: 2.6rem; line-height: 1; }
+  .card .temp { font-size: 2.2rem; font-weight: 600; }
+  .card .cond { font-weight: 500; }
+  .card dl { display: grid; grid-template-columns: auto auto; gap: 2px 8px; margin: 8px 0 0;
+             font-size: .85rem; color: var(--muted); }
+  .card dd { margin: 0; text-align: right; color: var(--text); }
+  .card .remove { position: absolute; top: 6px; right: 8px; border: 0; background: none;
+                  color: var(--muted); padding: 2px 6px; font-size: 1.1rem; }
+  /* Each card is themed by its own city's day/night, independent of the page theme */
+  .card.day { --card: #ffffff; --text: #1b2733; --muted: #5d6e80; --border: #d9e2ec;
+              --shadow: 0 2px 8px rgba(20,40,70,.08); }
+  .card.night { --card: #182333; --text: #e6edf5; --muted: #9db0c4; --border: #2c3d54;
+                --shadow: 0 2px 8px rgba(0,0,0,.4); }
+  .card.night { background-image: linear-gradient(160deg, #182333, #111b2a); }
+  .card.skeleton { min-height: 170px; opacity: .5; }
+</style>
+</head>
+<body>
+<header>
+  <div class="titlebar">
+    <h1>🌍 World Weather</h1>
+    <button id="themeSwitch" class="theme-switch" role="switch" aria-checked="false" aria-label="Dark mode">
+      <span id="themeLabel">Light</span>
+      <span class="track"><span class="thumb" id="themeThumb">☀️</span></span>
+    </button>
+  </div>
+  <p class="sub">Current conditions in cities around the globe. Data: Open-Meteo.</p>
+  <div class="toolbar">
+    <div class="search">
+      <input id="q" type="search" placeholder="Search any city to add it…" autocomplete="off">
+      <button id="go">Search</button>
+      <div id="results" class="results" hidden></div>
+    </div>
+    <div class="seg" role="group" aria-label="Units">
+      <button id="unitC" class="active">°C</button><button id="unitF">°F</button>
+    </div>
+    <button id="refresh">↻ Refresh</button>
+  </div>
+  <div id="filters" class="filters"></div>
+  <div id="status" class="status"></div>
+</header>
+<main><div id="grid" class="grid"></div></main>
+
+<script>
+const DEFAULT_CITIES = [
+  ["New York","United States",40.71,-74.01,"North America"],
+  ["Los Angeles","United States",34.05,-118.24,"North America"],
+  ["Toronto","Canada",43.65,-79.38,"North America"],
+  ["Mexico City","Mexico",19.43,-99.13,"North America"],
+  ["São Paulo","Brazil",-23.55,-46.63,"South America"],
+  ["Buenos Aires","Argentina",-34.60,-58.38,"South America"],
+  ["Lima","Peru",-12.05,-77.04,"South America"],
+  ["London","United Kingdom",51.51,-0.13,"Europe"],
+  ["Paris","France",48.86,2.35,"Europe"],
+  ["Berlin","Germany",52.52,13.41,"Europe"],
+  ["Moscow","Russia",55.76,37.62,"Europe"],
+  ["Cairo","Egypt",30.04,31.24,"Africa"],
+  ["Lagos","Nigeria",6.52,3.38,"Africa"],
+  ["Nairobi","Kenya",-1.29,36.82,"Africa"],
+  ["Cape Town","South Africa",-33.92,18.42,"Africa"],
+  ["Dubai","United Arab Emirates",25.20,55.27,"Asia"],
+  ["Mumbai","India",19.08,72.88,"Asia"],
+  ["Delhi","India",28.61,77.21,"Asia"],
+  ["Bangkok","Thailand",13.76,100.50,"Asia"],
+  ["Singapore","Singapore",1.35,103.82,"Asia"],
+  ["Beijing","China",39.90,116.41,"Asia"],
+  ["Tokyo","Japan",35.68,139.69,"Asia"],
+  ["Sydney","Australia",-33.87,151.21,"Oceania"],
+  ["Auckland","New Zealand",-36.85,174.76,"Oceania"],
+].map(([name, country, lat, lon, continent]) => ({ name, country, lat, lon, continent }));
+
+const WMO = {
+  0: ["Clear sky","☀️","🌙"], 1: ["Mainly clear","🌤️","🌙"], 2: ["Partly cloudy","⛅","☁️"],
+  3: ["Overcast","☁️","☁️"], 45: ["Fog","🌫️","🌫️"], 48: ["Rime fog","🌫️","🌫️"],
+  51: ["Light drizzle","🌦️","🌧️"], 53: ["Drizzle","🌦️","🌧️"], 55: ["Heavy drizzle","🌧️","🌧️"],
+  56: ["Freezing drizzle","🌧️","🌧️"], 57: ["Freezing drizzle","🌧️","🌧️"],
+  61: ["Light rain","🌦️","🌧️"], 63: ["Rain","🌧️","🌧️"], 65: ["Heavy rain","🌧️","🌧️"],
+  66: ["Freezing rain","🌧️","🌧️"], 67: ["Freezing rain","🌧️","🌧️"],
+  71: ["Light snow","🌨️","🌨️"], 73: ["Snow","❄️","❄️"], 75: ["Heavy snow","❄️","❄️"],
+  77: ["Snow grains","❄️","❄️"], 80: ["Rain showers","🌦️","🌧️"], 81: ["Rain showers","🌧️","🌧️"],
+  82: ["Violent showers","⛈️","⛈️"], 85: ["Snow showers","🌨️","🌨️"], 86: ["Snow showers","🌨️","🌨️"],
+  95: ["Thunderstorm","⛈️","⛈️"], 96: ["Thunderstorm, hail","⛈️","⛈️"], 99: ["Thunderstorm, hail","⛈️","⛈️"],
+};
+const describe = (code, isDay) => {
+  const w = WMO[code] || ["Unknown","🌡️","🌡️"];
+  return { text: w[0], icon: isDay ? w[1] : w[2] };
+};
+
+const $ = id => document.getElementById(id);
+const state = { custom: [], weather: new Map(), unit: "C", continent: "All", updated: null };
+
+const key = c => `${c.lat.toFixed(2)},${c.lon.toFixed(2)}`;
+const allCities = () => [...DEFAULT_CITIES, ...state.custom];
+
+function load() {
+  try {
+    state.custom = JSON.parse(localStorage.getItem("customCities") || "[]");
+    state.unit = localStorage.getItem("unit") === "F" ? "F" : "C";
+  } catch {}
+}
+function save() {
+  try {
+    localStorage.setItem("customCities", JSON.stringify(state.custom));
+    localStorage.setItem("unit", state.unit);
+  } catch {}
+}
+
+async function fetchWeather(cities) {
+  const out = new Map();
+  for (let i = 0; i < cities.length; i += 50) {
+    const batch = cities.slice(i, i + 50);
+    const url = "https://api.open-meteo.com/v1/forecast"
+      + `?latitude=${batch.map(c => c.lat).join(",")}`
+      + `&longitude=${batch.map(c => c.lon).join(",")}`
+      + "&current=temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,weather_code,is_day"
+      + "&timezone=auto";
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`Weather service returned ${res.status}`);
+    const data = await res.json();
+    (Array.isArray(data) ? data : [data]).forEach((d, j) => out.set(key(batch[j]), d.current));
+  }
+  return out;
+}
+
+const fmtTemp = c => {
+  const v = state.unit === "F" ? c * 9 / 5 + 32 : c;
+  return `${Math.round(v)}°${state.unit}`;
+};
+const fmtWind = kmh => state.unit === "F" ? `${Math.round(kmh * 0.621371)} mph` : `${Math.round(kmh)} km/h`;
+
+function renderFilters() {
+  const conts = ["All", ...new Set(allCities().map(c => c.continent))];
+  $("filters").innerHTML = "";
+  conts.forEach(name => {
+    const b = document.createElement("button");
+    b.textContent = name;
+    if (name === state.continent) b.className = "active";
+    b.onclick = () => { state.continent = name; renderFilters(); renderGrid(); };
+    $("filters").append(b);
+  });
+}
+
+function renderGrid() {
+  const grid = $("grid");
+  grid.innerHTML = "";
+  allCities()
+    .filter(c => state.continent === "All" || c.continent === state.continent)
+    .forEach(c => {
+      const w = state.weather.get(key(c));
+      const card = document.createElement("div");
+      if (!w) { card.className = "card skeleton"; card.innerHTML = `<h2></h2>`; card.firstChild.textContent = c.name; grid.append(card); return; }
+      const d = describe(w.weather_code, w.is_day);
+      card.className = "card " + (w.is_day ? "day" : "night");
+      card.innerHTML = `
+        <h2></h2><div class="country"></div>
+        <div class="main"><span class="icon">${d.icon}</span><span class="temp">${fmtTemp(w.temperature_2m)}</span></div>
+        <div class="cond">${d.text}</div>
+        <dl>
+          <dt>Feels like</dt><dd>${fmtTemp(w.apparent_temperature)}</dd>
+          <dt>Humidity</dt><dd>${Math.round(w.relative_humidity_2m)}%</dd>
+          <dt>Wind</dt><dd>${fmtWind(w.wind_speed_10m)}</dd>
+        </dl>`;
+      card.querySelector("h2").textContent = c.name;
+      card.querySelector(".country").textContent = c.country;
+      if (state.custom.includes(c)) {
+        const x = document.createElement("button");
+        x.className = "remove"; x.title = "Remove"; x.textContent = "×";
+        x.onclick = () => {
+          state.custom = state.custom.filter(k => k !== c);
+          save(); renderFilters(); renderGrid();
+        };
+        card.append(x);
+      }
+      grid.append(card);
+    });
+}
+
+function setStatus(msg, err) {
+  $("status").textContent = msg;
+  $("status").className = "status" + (err ? " error" : "");
+}
+
+async function refresh() {
+  setStatus("Loading weather…");
+  try {
+    state.weather = await fetchWeather(allCities());
+    state.updated = new Date();
+    setStatus(`Updated ${state.updated.toLocaleTimeString()} · ${state.weather.size} cities`);
+  } catch (e) {
+    setStatus(`Couldn't load weather: ${e.message}. Check your connection and try again.`, true);
+  }
+  renderGrid();
+}
+
+async function search() {
+  const q = $("q").value.trim();
+  const box = $("results");
+  if (!q) { box.hidden = true; return; }
+  box.hidden = false;
+  box.innerHTML = `<div class="none">Searching…</div>`;
+  try {
+    const res = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=6`);
+    const data = await res.json();
+    box.innerHTML = "";
+    if (!data.results || !data.results.length) { box.innerHTML = `<div class="none">No matches</div>`; return; }
+    data.results.forEach(r => {
+      const b = document.createElement("button");
+      b.textContent = [r.name, r.admin1, r.country].filter(Boolean).join(", ");
+      b.onclick = () => {
+        const city = { name: r.name, country: [r.admin1, r.country].filter(Boolean).join(", "),
+                       lat: r.latitude, lon: r.longitude, continent: "Added" };
+        if (!allCities().some(c => key(c) === key(city))) {
+          state.custom.push(city); save(); renderFilters(); refresh();
+        }
+        box.hidden = true; $("q").value = "";
+      };
+      box.append(b);
+    });
+  } catch {
+    box.innerHTML = `<div class="none">Search failed. Try again.</div>`;
+  }
+}
+
+function setUnit(u) {
+  state.unit = u; save();
+  $("unitC").className = u === "C" ? "active" : "";
+  $("unitF").className = u === "F" ? "active" : "";
+  renderGrid();
+}
+
+$("go").onclick = search;
+$("q").addEventListener("keydown", e => { if (e.key === "Enter") search(); });
+document.addEventListener("click", e => { if (!e.target.closest(".search")) $("results").hidden = true; });
+$("unitC").onclick = () => setUnit("C");
+$("unitF").onclick = () => setUnit("F");
+$("refresh").onclick = refresh;
+
+function applyTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  const dark = theme === "dark";
+  $("themeSwitch").setAttribute("aria-checked", dark);
+  $("themeLabel").textContent = dark ? "Dark" : "Light";
+  $("themeThumb").textContent = dark ? "🌙" : "☀️";
+}
+// Theme follows the viewer's local time (light 6:00–18:00, dark otherwise)
+// until they flip the switch; the manual choice lasts for this visit.
+const timeTheme = () => { const h = new Date().getHours(); return h >= 6 && h < 18 ? "light" : "dark"; };
+let manualTheme = false;
+$("themeSwitch").onclick = () => {
+  manualTheme = true;
+  applyTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
+};
+applyTheme(timeTheme());
+setInterval(() => { if (!manualTheme) applyTheme(timeTheme()); }, 60000);
+
+load();
+setUnit(state.unit);
+renderFilters();
+renderGrid();
+refresh();
+</script>
+</body>
+</html>
